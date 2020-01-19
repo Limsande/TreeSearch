@@ -21,8 +21,9 @@
 """
 TreeSearch - a synonym-aware location search tool for tree species.
 
-Communicates with plantsoftheworldonline.org and [GlobalTreeSearch](https://www.bgci.org/global_tree_search.php) to
-implement a synonym-aware location lookup.
+Queries publicly available online data bases to implement a synonym-aware location lookup. Currently,
+Plants of the World online <plantsoftheworldonline.org> is used for synonym lookup and GlobalTreeSearch
+<https://www.bgci.org/global_tree_search.php> provides location data.
 
 Usage:
     tree_search.py GENUS SPECIES AUTHOR [--output=FILE]
@@ -31,12 +32,13 @@ Usage:
 
 Options:
     -h, --help  Print this help text and exit.
-    -i, --input=FILE  Input file to read tuples of (genus, species, author) from (as CSV).
+    -i, --input=FILE  Input file to read tuples of (genus, species, author) from (as CSV). Must contain columns "Name"
+        and "Author", additional columns are ignored and preserved in the output.
     -o, --output=FILE  Output file to write results to (as CSV).
     -v, --version  Print version info and exit.
 
 Author:
-    Written by Luis Imsande (limsande(at)gmail dot com).
+    Written by Luis Imsande (limsande(at)yahoo dot com).
 
 Report bugs:
     Please report any bugs at <https://github.com/Limsande/TreeSearch/issues>.
@@ -47,7 +49,7 @@ Copyright:
 """
 
 __author__ = 'Luis Imsande'
-__email__ = 'limsande(at)gmail dot com'
+__email__ = 'limsande(at)yahoo dot com'
 __date__ = 'January 2020'
 __copyright__ = '(C) 2020, Luis Imsande'
 __license__ = 'GPLv2'
@@ -69,9 +71,14 @@ from pykew.ipni_terms import Name
 from requests.exceptions import RequestException
 
 TOTAL_NAMES_PROCESSED = 0
+TOTAL_LOCATION_QUERIES_SUCCEEDED = 0
 
 
 def get_locations(name: str, author: str) -> set:
+    """
+    Fetches synonyms and locations for (name, author).
+    """
+
     # Only names with two parts (genus, species) supported.
     name_parts = name.split(' ')
     if len(name_parts) > 1:
@@ -96,6 +103,12 @@ def get_locations(name: str, author: str) -> set:
 
 
 def get_ipni_id(genus: str, species: str, author: str) -> str:
+    """
+    Looks up the IPNI ID (International Plant Name Index) from ipni.org for (genus, species, author) via their API.
+    With this, we can later get all synonyms. If anything fails, an empty string is returned.
+
+    :return: the IPNI ID, if found; an empty sting otherwise
+    """
     print('Querying beta.ipni.org for record with genus: {}, species: {}, and author: {}...'.format(genus, species, author))
     res = ''
     try:
@@ -116,6 +129,14 @@ def get_ipni_id(genus: str, species: str, author: str) -> str:
 
 
 def get_synonyms(ipni_id: str) -> list:
+    """
+    Fetches all synonyms for this IPNI ID from plantsoftheworldonline.org via their API. If the query returns, that this
+    ID itself is a synonym, the corresponding accepted name is used instead for another query, which result is then
+    returned. If the input is an empty string, this function returns immediately with an empty list. If anything fails,
+    also an empty list is returned.
+
+    :return: a list of synonyms, if found any; an empty list otherwise
+    """
     res = []
     if ipni_id is not '':
         print('Querying plantsoftheworldonline.org for synonyms of "{}"...'.format(ipni_id))
@@ -152,7 +173,14 @@ def get_synonyms(ipni_id: str) -> list:
 
 
 def get_locations_from_gts(name: str) -> set:
-    global TOTAL_NAMES_PROCESSED
+    """
+    Fetches and returns a set of all locations (if any) for the given name from bgci.org via a GET request. If the query
+    fails due to a network error, user is prompted for how to succeed (just skip or quit entirely).
+
+    :return: a (possibly empty) set of all locations for this species name
+    :raises RequestException: if the query fails due to a network error and user decides to quit
+    """
+    global TOTAL_NAMES_PROCESSED, TOTAL_LOCATION_QUERIES_SUCCEEDED
     TOTAL_NAMES_PROCESSED += 1
     genus, species = name.split(' ')[:2]
     res = set()
@@ -162,9 +190,10 @@ def get_locations_from_gts(name: str) -> set:
             'http://data.bgci.org/treesearch/genus/{genus}/species/{species}'.format(genus=genus, species=species))
         resp = resp.json()
         if len(resp['results']) > 0:
+            TOTAL_LOCATION_QUERIES_SUCCEEDED += 1
             # Locations seem to be not always free of duplicates.
             res = set([loc['country'] for result in resp['results'] for loc in result['TSGeolinks']])
-            print('Retrieved {} locations:'.format(len(res)))
+            print('{} hit(s):'.format(len(res)))
             for r in res:
                 print(r)
             print()
@@ -179,6 +208,17 @@ def get_locations_from_gts(name: str) -> set:
     return res
 
 
+def print_data_frame(df: pd.DataFrame):
+    for _, d in df.iterrows():
+        if d.Locations == '':
+            continue
+        else:
+            print('{}, {}:'.format(d.Name, d.Author))
+            for loc in d.Locations.split('; '):
+                print(loc)
+            print()
+
+
 if __name__ == '__main__':
     # Get arguments provided via command line.
     args = docopt(__doc__)
@@ -186,7 +226,11 @@ if __name__ == '__main__':
     if args['--version']:
         print('TreeSearch version', __version__)
         sys.exit()
-    elif args['--input'] is not None:
+
+    # Two forms of input possible:
+    # 1) If we received an input file, try to load it as data frame. Make sure, that all required columns are present.
+    # 2) If input came directly via command line, build a new data frame with it.
+    if args['--input'] is not None:
         try:
             data = pd.read_csv(args['--input'])
         except IOError as e:
@@ -194,18 +238,22 @@ if __name__ == '__main__':
 
         if 'Name' not in data.columns or 'Author' not in data.columns:
             sys.exit('Missing columns: Expected at least "Name" and "Author", but got {}'.format(data.columns))
+
+        if len(data) is 0:
+            print('No data.')
+            sys.exit()
     else:
         data = pd.DataFrame({'Name': ['{} {}'.format(args['GENUS'], args['SPECIES'])], 'Author': [args['AUTHOR']]})
 
-    if len(data) is 0:
-        print('No data.')
-        sys.exit()
-
+    # Now iteratively fetch locations for all given species names and collect them as one list we can later append as
+    # new column 'Locations' to our data frame. Be careful with empty name or author, pandas would have converted them
+    # into NaN while loading the input file. This would cause problems. Therefor skip those records (we cannot do much
+    # with incomplete data anyway).
     locations = [''] * len(data)
-    start_time = time.process_time()
+    start_time = time.time()
     for i, d in data.iterrows():
-        if not (isinstance(d.Author, float) and np.isnan(d.Author)):
-            print('-' * 80)
+        print('-' * 80)
+        if not any([(isinstance(val, float) and np.isnan(val)) for val in [d.Name, d.Author]]):
             print('{:^80}'.format('Now: {} ({})'.format(d.Name, d.Author)))
             print('-' * 80)
             try:
@@ -213,19 +261,29 @@ if __name__ == '__main__':
                 current_locs = '; '.join(current_locs)
                 locations[i] = current_locs
             except RequestException:
+                # This means the user requested to quit.
                 break
-        else:
+        elif isinstance(d.Name, float) and np.isnan(d.Name):
+            print('{:^80}'.format('Skipping record #{}: Missing name'.format(i)))
             print('-' * 80)
+        else:
             print('{:^80}'.format('Skipping {}: Missing author'.format(d.Name)))
             print('-' * 80)
 
     data['Locations'] = locations
 
     print('-' * 80)
-    print('{:^80}'.format('Done.'))
+    print('{:^80}'.format('Summary'))
     print('-' * 80)
-    print('Processed {} names in {:.2f} seconds.'.format(TOTAL_NAMES_PROCESSED, time.process_time() - start_time))
+    print('Processed {names} names in {secs:.2f} seconds and found locations for {hits} of {specs} species.'.format(
+        names=TOTAL_NAMES_PROCESSED, secs=time.time() - start_time, hits=TOTAL_LOCATION_QUERIES_SUCCEEDED,
+        specs=len(data)))
+    print()
 
+    # Two possible ways of output:
+    # 1) If an output file is given, try to write it (create all directories if needed). If this fails, try to
+    #    create the file in user home. If this fails, too, just print everything to stdout.
+    # 2) If no output file is given, just print everything to stdout.
     if args['--output'] is not None:
         try:
             if not os.path.exists(os.path.dirname(args['--output'])):
@@ -243,13 +301,7 @@ if __name__ == '__main__':
                 print('Results written to', file, file=sys.stderr)
             except IOError as e:
                 print('Could not write results: {}'.format(e), file=sys.stderr)
-                print(data)
+                print_data_frame(data[['Name', 'Author', 'Locations']])
                 sys.exit(1)
     else:
-        print('-' * 80)
-        print('{:^80}'.format('Summary'))
-        print('-' * 80)
-        if args['--input'] is None:
-            print(data.Locations.iloc[0])
-        else:
-            print(data)
+        print_data_frame(data[['Name', 'Author', 'Locations']])
