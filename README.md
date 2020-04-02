@@ -41,7 +41,7 @@ directory. This should tell you the `pwd` command or `cd` on Windows.
 
 Once pip finished downloading and installing the dependencies, you should be able to run TreeSearch by typing
 ```bash
-python3 -m treesearch.py -h
+python3 -m treesearch -h
 ```
 which will show you instructions on how to use it (as the next section of this document does).
 
@@ -49,18 +49,18 @@ which will show you instructions on how to use it (as the next section of this d
 # Usage
 To search for locations of the stone pine (*Pinus pinea*, described by L.), for example, simply type
 ```bash
-python3 -m treesearch.py Pinus pinea L.
+python3 -m treesearch Pinus pinea L.
 ```
 
 It is also possible to write the results to file in CSV format with the `-o` (or `--output`) flag:
 ```bash
-python3 -m treesearch.py Pinus pinea L. -o output_file.csv
+python3 -m treesearch Pinus pinea L. -o output_file.csv
 ```
 
 TreeSearch can also operate in batch mode by accepting a CSV file (comma ',' as field separator) with
 multiple species names as input via the `-i` (or `--input`) flag:
 ```bash
-python3 -m treesearch.py -i input_file.csv -o output_file.csv
+python3 -m treesearch -i input_file.csv -o output_file.csv
 ```
 This input file must (at least) contain a column *"Name"*, and a column *"Author"*. All additional columns are
 preserved and ignored.
