@@ -286,8 +286,9 @@ if __name__ == '__main__':
     # 2) If no output file is given, just print everything to stdout.
     if args['--output'] is not None:
         try:
-            if not os.path.exists(os.path.dirname(args['--output'])):
-                os.makedirs(os.path.dirname(args['--output']), exist_ok=True)
+            output_dir = os.path.dirname(args['--output'])
+            if output_dir != '' and not os.path.exists(output_dir):
+                os.makedirs(output_dir, exist_ok=True)
             data.to_csv(args['--output'], index=False, quoting=csv.QUOTE_NONNUMERIC)
             print('Results written to', args['--output'])
         except IOError as e:
