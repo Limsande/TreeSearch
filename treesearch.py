@@ -223,6 +223,10 @@ if __name__ == '__main__':
     # Get arguments provided via command line.
     args = docopt(__doc__)
 
+    if len(sys.argv[1:]) is 0:
+        print(__doc__)
+        sys.exit()
+
     if args['--version']:
         print('TreeSearch version', __version__)
         sys.exit()
