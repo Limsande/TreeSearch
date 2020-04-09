@@ -236,12 +236,15 @@ if __name__ == '__main__':
     # 2) If input came directly via command line, build a new data frame with it.
     if args['--input'] is not None:
         try:
-            data = pd.read_csv(args['--input'])
+            # sep=None + engine='python' automatically determines field separator
+            data = pd.read_csv(args['--input'], sep=None, engine='python')
         except IOError as e:
             sys.exit('Could not read file: {}'.format(e))
 
         if 'Name' not in data.columns or 'Author' not in data.columns:
-            sys.exit('Missing columns: Expected at least "Name" and "Author", but got {}'.format(data.columns))
+            sys.exit(
+                'Missing columns: Expected at least "Name" and "Author", but got {}'.format(
+                    [col for col in data.columns]))
 
         if len(data) is 0:
             print('No data.')

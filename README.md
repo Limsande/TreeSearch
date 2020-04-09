@@ -52,12 +52,12 @@ To search for locations of the stone pine (*Pinus pinea*, described by L.), for 
 python3 -m treesearch Pinus pinea L.
 ```
 
-It is also possible to write the results to file in CSV format with the `-o` (or `--output`) flag:
+It is also possible to write the results to a comma-separated CSV file with the `-o` (or `--output`) flag:
 ```bash
 python3 -m treesearch Pinus pinea L. -o output_file.csv
 ```
 
-TreeSearch can also operate in batch mode by accepting a CSV file (comma ',' as field separator) with
+TreeSearch can also operate in batch mode by accepting a CSV file (arbitrary field separator) with
 multiple species names as input via the `-i` (or `--input`) flag:
 ```bash
 python3 -m treesearch -i input_file.csv -o output_file.csv
