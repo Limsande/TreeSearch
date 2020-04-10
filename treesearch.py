@@ -189,7 +189,9 @@ def get_locations_from_gts(name: str) -> set:
         resp = requests.get(
             'http://data.bgci.org/treesearch/genus/{genus}/species/{species}'.format(genus=genus, species=species))
         resp = resp.json()
-        if len(resp['results']) > 0:
+        if 'error' in resp.keys():
+            print('Response with error: {}'.format(resp['error']), file=sys.stderr)
+        elif len(resp['results']) > 0:
             TOTAL_LOCATION_QUERIES_SUCCEEDED += 1
             # Locations seem to be not always free of duplicates.
             res = set([loc['country'] for result in resp['results'] for loc in result['TSGeolinks']])
