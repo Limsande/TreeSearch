@@ -74,25 +74,42 @@ TOTAL_NAMES_PROCESSED = 0
 TOTAL_LOCATION_QUERIES_SUCCEEDED = 0
 
 
-def get_locations(name: str, author: str) -> set:
+def parse_name(name: str) -> (str, str):
     """
-    Fetches synonyms and locations for (name, author).
-    """
+    Extracts genus and species from a name string.
 
+    The string is split at whitespaces and the first two groups of consecutive
+    alphabetic characters are returned as genus and species, respectively.
+
+    If there are no such two groups, a ValueError is raised.
+
+    :raises ValueError: If name cannot be split into genus and species.
+    """
     # Only names with two parts (genus, species) supported.
-    name_parts = name.split(' ')
+    name_parts = [part for part in name.split(' ') if part.isalpha()]
     if len(name_parts) > 1:
         genus, species = name_parts[:2]
     else:
-        print("ERROR: Invalid name: {}. Skipping.".format(name), file=sys.stderr)
-        return set()
+        raise ValueError('Cannot split {} into genus and species.'.format(name))
+
+    return genus, species
+
+
+def get_locations(name: str, author: str) -> set:
+    """
+    Fetches synonyms and locations for (name, author).
+
+    :raises ValueError: If name cannot be split into genus and species.
+    """
+
+    genus, species = parse_name(name)
 
     # Get the unique IPNI ID for this tuple of (genus, species, author).
     ipni_id = get_ipni_id(genus, species, author)
 
     # With this ID, we can look up a synonym list.
     synonyms = get_synonyms(ipni_id)
-    synonyms.append(name)
+    synonyms.append(' '.join([genus, species]))
 
     # Query GTS for locations of each synonym.
     locations = []
@@ -269,6 +286,8 @@ if __name__ == '__main__':
                 current_locs = get_locations(d.Name, d.Author)
                 current_locs = '; '.join(current_locs)
                 locations[i] = current_locs
+            except ValueError as e:
+                print('ERROR: Invalid name: {e}', file=sys.stderr)
             except RequestException:
                 # This means the user requested to quit.
                 break

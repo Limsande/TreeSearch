@@ -75,6 +75,13 @@ TreeSearch is able to find locations for 3/5 species and yields the following fi
 ![example output](doc/images/example_output.png)
 
 
+#### Valid names
+To extract genus and species from a name such as _Daphne sericea_, the first two groups of alphabetic characters, 
+separated by any number of whitespaces, are used. In this example this yields _Daphne_ as genus and _sericea_ as
+species, as it would for names with more than two parts, like _Daphne sericea spec._ Names without such two groups, like
+_Daphne_, are invalid and therefor ignored.
+
+
 # Contact and bug reports
 You can contact the author via e-mail at <limsande(at)yahoo dot com>. Feature suggestions and feedback of any
 kind are very appreciated.
